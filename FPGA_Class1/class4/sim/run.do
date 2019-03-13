@@ -25,11 +25,12 @@ add wave tb_shift/tb_lvds_clk
 add wave tb_shift/tb_rst_n
 add wave tb_shift/tb_lvds_d
 add wave tb_shift/tb_o_lvds_d
+add wave -divider {name}
 add wave tb_shift/shift_inst/*
 
 # 运行
 run 运行时间
-run 100ns
+run 100us
 
 
 
