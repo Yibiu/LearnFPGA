@@ -1,0 +1,5 @@
+PLL_Name	tft_pll:tft_pll_inst0|altpll:altpll_component|tft_pll_altpll:auto_generated|pll1
+PLLJITTER	53
+PLLSPEmax	84
+PLLSPEmin	-53
+
