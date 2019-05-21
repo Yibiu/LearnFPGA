@@ -8,31 +8,20 @@ module uart_recv(
 	input wire rst_n,
 	input wire [2:0] baud,
 	input wire data,
+	output reg rx_state,
 	output reg [7:0] rx_data,
 	output reg rx_done
 );
 
-parameter IDEL = 11'b000_0000_0001;
-parameter START = 11'b000_0000_0010;
-parameter DATA0 = 11'b000_0000_0100;
-parameter DATA1 = 11'b000_0000_1000;
-parameter DATA2 = 11'b000_0001_0000;
-parameter DATA3 = 11'b000_0010_0000;
-parameter DATA4 = 11'b000_0100_0000;
-parameter DATA5 = 11'b000_1000_0000;
-parameter DATA6 = 11'b001_0000_0000;
-parameter DATA7 = 11'b010_0000_0000;
-parameter STOP = 11'b100_0000_0000;
 
-reg [10:0] state;
+// START + DATA0~7 + STOP
+// 16 cnt for every state
+// 2^7 < 10 * 16 = 160 < 2^8
+reg [7:0] state_cnt;
 
 
-//
 // 开始位检测
-// 只有在IDEL状态才开始检测
-// pluse为Start脉冲
-//
-wire pluse;
+wire nedge;
 reg cur_data;
 reg last_data;
 always @(posedge clk_50mhz or negedge rst_n)
@@ -45,103 +34,147 @@ always @(posedge clk_50mhz or negedge rst_n)
 		last_data <= cur_data;
 	end
 
-assign pluse = (!cur_data) & last_data;
+assign nedge = (!cur_data) && last_data;
 
-always @(*)
-	if (pluse && state == IDEL)
-		state <= START;
+always @(posedge clk_50mhz or negedge rst_n)
+	if (rst_n == 1'b0)
+		rx_state <= 1'b0;
+	else if (nedge)
+		rx_state <= 1'b1;
+	else if (state_cnt == 8'd156)
+		rx_state <= 1'b0;
+	else
+		rx_state <= rx_state;
 
 
 //
 // 波特率计算和生成
-// 序号baud    波特率bps    周期ns    分频计数值               50MHz系统时钟脉冲计数值   50MHz系统时钟转bps_clk计数值
-// 0           9600         104167    104167/sys_clk_period    5208-1                    5208/2-1=2603
-// 1           19200        52083     52083/sys_clk_period     2604-1                    2604/2-1=1301
-// 2           38400        26041     26041/sys_clk_period     1302-1                    1302/2-1=650
-// 3           57600        17361     17361/sys_clk_period     868-1                     868/2-1=433
-// 4           115200       8680      8680/sys_clk_period      434-1                     434/2-1=216
+// 序号baud    波特率bps    周期ns    分频计数值               50MHz系统时钟脉冲计数值   波特率16分频计数
+// 0           9600         104167    104167/sys_clk_period    5208-1                    5208/16-1=324
+// 1           19200        52083     52083/sys_clk_period     2604-1                    2604/16-1=161
+// 2           38400        26041     26041/sys_clk_period     1302-1                    1302/16-1=80
+// 3           57600        17361     17361/sys_clk_period     868-1                     868/16-1=53
+// 4           115200       8680      8680/sys_clk_period      434-1                     434/16-1=26
 //
-reg [11:0] bps_target;
+reg [8:0] bps_target;
 always @(posedge clk_50mhz or negedge rst_n)
 	if (rst_n == 1'b0)
-		bps_target <= 12'd2603;
+		bps_target <= 9'd324;
 	else
 		case(baud)
-			3'd0:bps_target<=12'd2603;
-			3'd1:bps_target<=12'd1301;
-			3'd2:bps_target<=12'd650;
-			3'd3:bps_target<=12'd433;
-			3'd4:bps_target<=12'd216;
-			default:bps_target<=12'd2603;
+			3'd0:bps_target<=9'd324;
+			3'd1:bps_target<=9'd161;
+			3'd2:bps_target<=9'd80;
+			3'd3:bps_target<=9'd53;
+			3'd4:bps_target<=9'd26;
+			default:bps_target<=9'd324;
 		endcase
 
-reg [11:0] bps_cnt;
+reg [8:0] bps_cnt;
 always @(posedge clk_50mhz or negedge rst_n)
 	if (rst_n == 1'b0)
-		bps_cnt <= 12'd0;
-	else if (en && state != IDEL) begin
+		bps_cnt <= 9'd0;
+	else if (rx_state) begin
 		if (bps_cnt == bps_target)
-			bps_cnt <= 12'd0;
+			bps_cnt <= 9'd0;
 		else
 			bps_cnt <= bps_cnt + 1'b1;
 	end
 	else
-		bps_cnt <= 16'd0;
+		bps_cnt <= 9'd0;
 
-reg bps_clk;
 always @(posedge clk_50mhz or negedge rst_n)
 	if (rst_n == 1'b0)
-		bps_clk <= 1'b0;
-	else if (en && state != IDEL)
+		state_cnt <= 8'd0;
+	else if (rx_state) begin
+		if (bps_cnt == bps_target) begin
+			if (state_cnt == 8'd156)
+				state_cnt <= 8'd0;
+			else
+				state_cnt <= state_cnt + 1'b1;
+		end
+		else
+			state_cnt <= state_cnt;
+	end
+	else
+		state_cnt <= 8'd0;
+
+
+// 状态迁移
+reg [2:0] rx_start_r;
+reg [2:0] rx_stop_r;
+reg [2:0] rx_data_r [7:0];
+always @(negedge clk_50mhz or negedge rst_n)
+	if (rst_n == 1'b0) begin
+		rx_start_r <= 3'd0;
+		rx_stop_r <= 3'd0;
+		rx_data_r[0] <= 3'd0;
+		rx_data_r[1] <= 3'd0;
+		rx_data_r[2] <= 3'd0;
+		rx_data_r[3] <= 3'd0;
+		rx_data_r[4] <= 3'd0;
+		rx_data_r[5] <= 3'd0;
+		rx_data_r[6] <= 3'd0;
+		rx_data_r[7] <= 3'd0;
+	end
+	else if (rx_state) begin
 		if (bps_cnt == bps_target)
-			bps_clk <= ~bps_clk;
-	else
-		bps_clk <= 1'b0;
-
-
-// 状态变迁
-always @(negedge bps_clk or negedge rst_n)
-	if (rst_n == 1'b0)
-		state <= IDEL;
-	else
-		case(state)
-			START:state<=DATA0;
-			DATA0:state<=DATA1;
-			DATA1:state<=DATA2;
-			DATA2:state<=DATA3;
-			DATA3:state<=DATA4;
-			DATA4:state<=DATA5;
-			DATA5:state<=DATA6;
-			DATA6:state<=DATA7;
-			DATA7:state<=STOP;
-			STOP:state<=IDEL;
-			default:state<=IDEL;
-		endcase
-
-// 输出
-always @(posedge bps_clk or negedge rst_n)
-	if (rst_n == 1'b0)
-		rx_data <= 8'b1111_1111;
-	else
-		case(state)
-			START:rx_data<=8'b1111_1111;
-			DATA0:rx_data[0]<=data;
-			DATA1:rx_data[1]<=data;
-			DATA2:rx_data[2]<=data;
-			DATA3:rx_data[3]<=data;
-			DATA4:rx_data[4]<=data;
-			DATA5:rx_data[5]<=data;
-			DATA6:rx_data[6]<=data;
-			DATA7:rx_data[7]<=data;
-			STOP:rx_data<=rx_data;
-			default:rx_data<=rx_data;
-		endcase
-
-always @(posedge bps_clk or negedge rst_n)
-	if (rst_n == 1'b0)
+			case(state_cnt)
+				0:
+					begin
+						rx_start_r <= 3'd0;
+						rx_stop_r <= 3'd0;
+						rx_data_r[0] <= 3'd0;
+						rx_data_r[1] <= 3'd0;
+						rx_data_r[2] <= 3'd0;
+						rx_data_r[3] <= 3'd0;
+						rx_data_r[4] <= 3'd0;
+						rx_data_r[5] <= 3'd0;
+						rx_data_r[6] <= 3'd0;
+						rx_data_r[7] <= 3'd0;
+					end
+				6,7,8,9,10,11:rx_start_r<=rx_start_r+data;
+				22,23,24,25,26,27:rx_data_r[0]<=rx_data_r[0]+data;
+				38,39,40,41,42,43:rx_data_r[1]<=rx_data_r[1]+data;
+				54,55,56,57,58,59:rx_data_r[2]<=rx_data_r[2]+data;
+				70,71,72,73,74,75:rx_data_r[3]<=rx_data_r[3]+data;
+				86,87,88,89,90,91:rx_data_r[4]<=rx_data_r[4]+data;
+				102,103,104,105,106,107:rx_data_r[5]<=rx_data_r[5]+data;
+				118,119,120,121,122,123:rx_data_r[6]<=rx_data_r[6]+data;
+				134,135,136,137,138,139:rx_data_r[7]<=rx_data_r[7]+data;
+				150,151,152,153,154,155:rx_stop_r<=rx_stop_r+data;
+				default:
+					begin
+						rx_start_r <= rx_start_r;
+						rx_stop_r <= rx_stop_r;
+						rx_data_r[0] <= rx_data_r[0];
+						rx_data_r[1] <= rx_data_r[1];
+						rx_data_r[2] <= rx_data_r[2];
+						rx_data_r[3] <= rx_data_r[3];
+						rx_data_r[4] <= rx_data_r[4];
+						rx_data_r[5] <= rx_data_r[5];
+						rx_data_r[6] <= rx_data_r[6];
+						rx_data_r[7] <= rx_data_r[7];
+					end
+			endcase
+	end
+	
+always @(posedge clk_50mhz or negedge rst_n)
+	if (rst_n == 1'b0) begin
+		rx_data <= 8'd0;
 		rx_done <= 1'b0;
-	else if (state == STOP)
-		rx_done <= 1'b1;
+	end
+	else if (state_cnt == 8'd156) begin
+			rx_data[0] <= rx_data_r[0][2];
+			rx_data[1] <= rx_data_r[1][2];
+			rx_data[2] <= rx_data_r[2][2];
+			rx_data[3] <= rx_data_r[3][2];
+			rx_data[4] <= rx_data_r[4][2];
+			rx_data[5] <= rx_data_r[5][2];
+			rx_data[6] <= rx_data_r[6][2];
+			rx_data[7] <= rx_data_r[7][2];
+			rx_done <= 1'b1;
+	end
 	else
 		rx_done <= 1'b0;
 

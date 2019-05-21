@@ -25,6 +25,8 @@ always @(posedge clk_50mhz or negedge rst_n)
 		tx_state <= 1'b1;
 	else if (state_cnt == 4'd10)
 		tx_state <= 1'b0;
+	else
+		tx_state <= tx_state;
 
 
 //
