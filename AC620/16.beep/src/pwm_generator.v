@@ -26,7 +26,7 @@ always @(posedge clk_50mhz or negedge rst_n)
 	if (rst_n == 1'b0)
 		cnt <= 32'd0;
 	else if (en) begin
-		if (cnt == counter_arr)
+		if (cnt >= counter_arr)
 			cnt <= 32'd0;
 		else
 			cnt <= cnt + 1'b1;

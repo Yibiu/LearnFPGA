@@ -97,8 +97,9 @@ always @(*)
 		5'd18:counter_arr = H5;
 		5'd19:counter_arr = H6;
 		5'd20:counter_arr = H7;
+		default:counter_arr = L1;
 	endcase
-	
+
 // PWM占空比计数值，始终为50%
 assign counter_ccr = counter_arr >> 1;
 
