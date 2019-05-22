@@ -23,13 +23,13 @@ always #(CLK_NS / 2) tb_clock = ~tb_clock;
 // 初始化
 integer i;
 initial begin
-	tb_clock = 0;
-	tb_addr = 0;
+	tb_clock = 1'b0;
+	tb_addr = 8'd0;
 	#CLK_NS
 	for (i=0;i<2550;i=i+1) begin
 		tb_addr = i;
 		#CLK_NS
-		addr = addr + 1;
+		tb_addr = tb_addr + 1'b1;
 	end
 	#(CLK_NS * 50)
 	
