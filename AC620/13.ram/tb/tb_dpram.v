@@ -1,10 +1,6 @@
 `timescale 1ns/1ns
 
 
-/**
-* @brief:
-* 双端口RAM读写IP核。
-*/
 module tb_dpram(
 );
 
@@ -33,19 +29,20 @@ always #(CLK_NS / 2) tb_clock = ~tb_clock;
 // 初始化
 integer i;
 initial begin
-	tb_data = 0;
-	tb_r_addr = 0;
-	tb_w_addr = 0;
-	tb_wr_en = 0;
+	tb_clock = 1'b0;
+	tb_data = 8'd0;
+	tb_r_addr = 8'd0;
+	tb_w_addr = 8'd0;
+	tb_wr_en = 1'b0;
 	#(CLK_NS * 20)
 	
-	tb_wr_en = 1;
+	tb_wr_en = 1'b1;
 	for (i=0;i<=15;i=i+1) begin
-		data = 255 - i;
+		tb_data = 255 - i;
 		tb_w_addr = i;
 		#CLK_NS;
 	end
-	tb_wr_en = 0;
+	tb_wr_en = 1'b0;
 	#(CLK_NS * 20)
 	for (i=0;i<=15;i=i+1) begin
 		tb_r_addr = i;
