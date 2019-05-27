@@ -12,9 +12,9 @@ module adc(
 	output reg [11:0] adc_data,
 	output reg adc_done,
 	output reg adc_state,
+	output reg adc_cs_n,
 	output reg adc_sclk,
-	output reg adc_din,
-	
+	output reg adc_din // DIN(addr)
 );
 
 
