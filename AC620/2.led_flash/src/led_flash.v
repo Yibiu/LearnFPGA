@@ -43,5 +43,7 @@ always @(posedge clk_50mhz or negedge rst_n)
 		leds <= 4'b1111;
 	else if (cnt == CNT_500MS)
 		leds <= ~leds;
+	else
+		leds <= leds;
 
 endmodule
