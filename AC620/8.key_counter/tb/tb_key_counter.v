@@ -1,10 +1,6 @@
 `timescale 1ns/1ns
 
 
-/**
-* @brief:
-* 暂未仿真。
-*/
 module tb_key_counter(
 );
 
@@ -35,8 +31,10 @@ initial begin
 	tb_key_plus = 1'b1;
 	tb_key_minus = 1'b1;
 	#(CLK_NS * 10)
+	
 	tb_rst_n = 1'b1;
 	#(CLK_NS * 1000)
+	
 	press_key(tb_key_plus);
 	#(CLK_NS * 1000);
 	press_key(tb_key_plus);
@@ -60,23 +58,23 @@ task press_key;
 	begin
 		// 50次随机按下抖动(每次不大于20ms)
 		repeat(50) begin
-			rand_time = {$random} % 65536;
+			rand_time = {$random} % (CLK_NS * 90);
 			#rand_time
 			key = ~key;
 		end
 		
 		// DOWN状态
 		key = 1'b0;
-		#50_000_000
+		#(CLK_NS * 500);
 		
 		// 50次随机释放抖动(每次不大于20ms)
 		repeat(50) begin
-			rand_time = {$random} % 65536;
+			rand_time = {$random} % (CLK_NS * 90);
 			#rand_time
 			key = ~key;
 		end
 		key = 1'b1;
-		#50_000_000;
+		#(CLK_NS * 500);
 	end
 endtask
 
