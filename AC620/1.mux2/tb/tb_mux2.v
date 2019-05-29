@@ -19,28 +19,21 @@ mux2 mux2_inst0(
 
 // 初始化
 initial begin
-	tb_a = 0;tb_b = 0;tb_sel = 0;
+	tb_sel = 0;tb_a = 0;tb_b = 0;
 	#100
-	
-	tb_a = 1;tb_b = 0;tb_sel = 0;
+	tb_sel = 0;tb_a = 0;tb_b = 1;
 	#100
-
-	tb_a = 0;tb_b = 1;tb_sel = 0;
+	tb_sel = 0;tb_a = 1;tb_b = 0;
 	#100
-
-	tb_a = 1;tb_b = 1;tb_sel = 0;
+	tb_sel = 0;tb_a = 1;tb_b = 1;
 	#100
-
-	tb_a = 0;tb_b = 0;tb_sel = 1;
+	tb_sel = 1;tb_a = 0;tb_b = 0;
 	#100
-
-	tb_a = 1;tb_b = 0;tb_sel = 1;
+	tb_sel = 1;tb_a = 0;tb_b = 1;
 	#100
-
-	tb_a = 0;tb_b = 1;tb_sel = 1;
+	tb_sel = 1;tb_a = 1;tb_b = 0;
 	#100
-
-	tb_a = 1;tb_b = 1;tb_sel = 1;
+	tb_sel = 1;tb_a = 1;tb_b = 1;
 	#100
 
 	$stop;
