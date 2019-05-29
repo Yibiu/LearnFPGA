@@ -19,6 +19,7 @@ always @(a, b, c)
 		3'b101:out = 8'b0010_0000;
 		3'b110:out = 8'b0100_0000;
 		3'b111:out = 8'b1000_0000;
+		default:;
 	endcase
 
 endmodule
