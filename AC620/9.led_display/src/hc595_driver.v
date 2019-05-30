@@ -43,6 +43,8 @@ always @(posedge clk_50mhz or negedge rst_n)
 		clk_12_5mhz <= 1'b0;
 	else if (cnt == CNT_12_5MHZ)
 		clk_12_5mhz <= ~clk_12_5mhz;
+	else
+		clk_12_5mhz <= clk_12_5mhz;
 
 
 // 利用12.5Mhz进行计数，计数产生sh_clk和st_clk，并控制数据赋值
@@ -54,28 +56,6 @@ always @(posedge clk_12_5mhz or negedge rst_n)
 		cnt_edge <= 5'd0;
 	else
 		cnt_edge <= cnt_edge + 1'b1;
-
-/*
-always @(posedge clk_12_5mhz or negedge rst_n)
-	if (rst_n == 1'b0)
-		sh_clk <= 1'b0;
-	else
-		sh_clk <= ~sh_clk;
-
-always @(posedge clk_12_5mhz or negedge rst_n)
-	if (rst_n == 1'b0)
-		st_clk <= 1'b0;
-	else if (cnt_edge == 5'd31)
-		st_clk <= 1'b1;
-	else
-		st_clk <= 1'b0;
-
-always @(posedge clk_12_5mhz or negedge rst_n)
-	if (rst_n == 1'b0)
-		ds <= 1'b0;
-	else if (cnt_edge % 2 == 1'b0)
-		ds <= data[15 - cnt_edge / 2];
-*/
 
 always @(posedge clk_12_5mhz or negedge rst_n)
 	if (rst_n == 1'b0) begin
@@ -117,6 +97,7 @@ always @(posedge clk_12_5mhz or negedge rst_n)
 			5'd29:begin sh_clk<=1'b1;end
 			5'd30:begin sh_clk<=1'b0;ds<=data[0];end
 			5'd31:begin sh_clk<=1'b1;end
+			default:;
 		endcase
 		
 endmodule

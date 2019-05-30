@@ -36,9 +36,10 @@ reg clk_1khz;
 always @(posedge clk_50mhz or negedge rst_n)
 	if (rst_n == 1'b0)
 		clk_1khz <= 1'b0;
-	else if (en)
+	else if (en) begin
 		if (cnt == CNT_1KHZ)
 			clk_1khz <= ~clk_1khz;
+	end
 	else
 		clk_1khz <= 1'b0;
 
@@ -71,7 +72,7 @@ always @(*)
 		8'b0010_0000:seg_data = dis_data[23:20];
 		8'b0100_0000:seg_data = dis_data[27:24];
 		8'b1000_0000:seg_data = dis_data[31:28];
-		default:seg_data = 4'b0000;
+		default:;
 	endcase
 
 // BCD码到数码管显示码译码
@@ -95,6 +96,7 @@ always @(*)
 		4'b1101:seg = 8'b10100_001; // D
 		4'b1110:seg = 8'b10000_110; // E
 		4'b1111:seg = 8'b10001_110; // F
+		default:;
 	endcase
 	
 endmodule
