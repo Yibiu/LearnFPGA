@@ -58,8 +58,6 @@ endmodule
 
 ## 三：测试
 
-### 3.1 TestBench
-
 测试需包括真值表所有译码情况：
 
 testbench测试：
@@ -109,7 +107,11 @@ end
 endmodule
 ```
 
-### 3.2 波形
+仿真波形：
+
+![sim](./sim.png)
+
+仿真结果符合预期。
 
 
 
