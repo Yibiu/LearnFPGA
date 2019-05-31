@@ -90,8 +90,6 @@ endmodule
 
 ## 三：测试
 
-### 3.1 TestBench
-
 reset之后模拟输入多个字符。
 
 testbench测试：
@@ -194,7 +192,13 @@ end
 endmodule
 ```
 
-### 3.2 波形
+仿真波形：
+
+![sim](./sim.png)
+
+![sim1](./sim1.png)
+
+可见符合预期。
 
 
 
@@ -203,21 +207,4 @@ endmodule
 ## 四：验证
 
 无
-
-### 4.1 端口
-
-输入(按键)+输出(LED)
-
-```verilog
-a	-->	key0(PIN_M16)
-b	-->	key1(PIN_E15)
-sel	-->	key2(PIN_E16)
-out	-->	led0(PIN_A2)
-
-IO Standard: 3.3V-LVTTL
-```
-
-### 4.2 结果
-
-运行正确。
 
