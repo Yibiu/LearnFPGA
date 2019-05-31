@@ -36,24 +36,25 @@ initial begin
 	tb_rst_n = 1'b0;
 	tb_en = 1'b0;
 	tb_baud = 3'd0;
-	tb_data = 8'd1011_1010;
+	tb_data = 8'd0;
 	#(CLK_NS * 100)
 	
 	tb_rst_n = 1'b1;
 	#(CLK_NS * 100)
 	
+	tb_data = 8'b1011_1010;
 	tb_baud = 3'd4;
 	tb_en = 1'b1;
 	#(CLK_NS)
 	tb_en = 1'b0;
 	@(posedge tb_tx_done)
-	#(CLK_NS * 1000)
+	#(CLK_NS * 100)
 	tb_data = 8'b1000_0001;
 	tb_en = 1'b1;
 	#(CLK_NS)
 	tb_en = 1'b0;
 	@(posedge tb_tx_done)
-	#(CLK_NS * 1000)
+	#(CLK_NS * 100)
 	
 	$stop;
 end

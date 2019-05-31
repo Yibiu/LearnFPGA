@@ -18,11 +18,17 @@ FPGA设计思路为：由 `en` 标识一次数据传输的开始，并使用 `st
 
 ![time](./time.bmp)
 
+模块：
+
+![uart_send](./uart_send.jpg)
+
 
 
 
 
 ## 二：设计
+
+### 2.1 UART发送
 
 设计针对发送的详细时序：首先en接收到高脉冲，则标识传输开始，置tx_state为高，tx_state标识整个传输过程；之后开启波特率计数，当波特率计数满时state_cnt进行状态切换，同时根据state_cnt的状态值对tx赋值。
 
@@ -47,6 +53,52 @@ FPGA设计思路为：由 `en` 标识一次数据传输的开始，并使用 `st
 - 连续传输：对于连续传输，一般监测posedge tx_done，此时en置高开始新一轮传输。由上述分析可知程序可以正常运行。
 
 
+### 2.2 顶层模块
+
+使用ISSP输入数据，顶层模块负责实例化：
+
+```verilog
+module top_uart_send(
+	input wire clk_50mhz,
+	input wire rst_n,
+	input wire key_en,
+	output wire tx_data,
+	output wire tx_done
+);
+
+wire key_flag;
+wire key_state;
+key_filter key_filter_inst0(
+	.clk_50mhz(clk_50mhz),
+	.rst_n(rst_n),
+	.key_in(key_en),
+	.key_flag(key_flag),
+	.key_state(key_state)
+);
+
+wire [7:0] data;
+issp issp_inst0(
+	.probe(),
+	.source(data)
+);
+
+wire send_en;
+assign send_en = key_flag && !key_state;
+uart_send uart_send_inst0(
+	.clk_50mhz(clk_50mhz),
+	.rst_n(rst_n),
+	.en(send_en),
+	.baud(3'd0),
+	.data(data),
+	.tx_data(tx_data),
+	.tx_done(tx_done)
+);
+
+endmodule
+```
+
+
+
 
 
 
@@ -54,65 +106,80 @@ FPGA设计思路为：由 `en` 标识一次数据传输的开始，并使用 `st
 
 ### 3.1 TestBench
 
-测试需遍历所有可能情况：
+#### 3.1.1 UART发送模块测试
 
-| sel  | a    | b    | out期望输出 |
-| ---- | ---- | ---- | ----------- |
-| 0    | 0    | 0    | 0           |
-| 0    | 0    | 1    | 0           |
-| 0    | 1    | 0    | 1           |
-| 0    | 1    | 1    | 1           |
-| 1    | 0    | 0    | 0           |
-| 1    | 0    | 1    | 1           |
-| 1    | 1    | 0    | 0           |
-| 1    | 1    | 1    | 1           |
+为了减少仿真时间，仿真时选择最大比特率。
 
 testbench测试：
 
 ```verilog
 `timescale 1ns/1ns
- 
 
-module tb_mux2(
+
+module tb_uart_send(
 );
 
-reg tb_a;
-reg tb_b;
-reg tb_sel;
-wire tb_out;
+reg tb_clk_50mhz;
+reg tb_rst_n;
+reg tb_en;
+reg [2:0] tb_baud;
+reg [7:0] tb_data;
+wire tb_tx_state;
+wire tb_tx_data;
+wire tb_tx_done;
 
-// mux2例化
-mux2 mux2_inst0(
-	.a(tb_a),
-	.b(tb_b),
-	.sel(tb_sel),
-	.out(tb_out)
+parameter CLK_NS = 20;
+
+// 例化
+uart_send uart_send_inst0(
+	.clk_50mhz(tb_clk_50mhz),
+	.rst_n(tb_rst_n),
+	.en(tb_en),
+	.baud(tb_baud),
+	.data(tb_data),
+	.tx_state(tb_tx_state),
+	.tx_data(tb_tx_data),
+	.tx_done(tb_tx_done)
 );
+
+// 时钟
+always #(CLK_NS / 2) tb_clk_50mhz = ~tb_clk_50mhz;
 
 // 初始化
 initial begin
-	tb_sel = 0;tb_a = 0;tb_b = 0;
-	#100
-	tb_sel = 0;tb_a = 0;tb_b = 1;
-	#100
-	tb_sel = 0;tb_a = 1;tb_b = 0;
-	#100
-	tb_sel = 0;tb_a = 1;tb_b = 1;
-	#100
-	tb_sel = 1;tb_a = 0;tb_b = 0;
-	#100
-	tb_sel = 1;tb_a = 0;tb_b = 1;
-	#100
-	tb_sel = 1;tb_a = 1;tb_b = 0;
-	#100
-	tb_sel = 1;tb_a = 1;tb_b = 1;
-	#100
-
+	tb_clk_50mhz = 1'b0;
+	tb_rst_n = 1'b0;
+	tb_en = 1'b0;
+	tb_baud = 3'd0;
+	tb_data = 8'd0;
+	#(CLK_NS * 100)
+	
+	tb_rst_n = 1'b1;
+	#(CLK_NS * 100)
+	
+	tb_data = 8'b1011_1010;
+	tb_baud = 3'd4;
+	tb_en = 1'b1;
+	#(CLK_NS)
+	tb_en = 1'b0;
+	@(posedge tb_tx_done)
+	#(CLK_NS * 100)
+	tb_data = 8'b1000_0001;
+	tb_en = 1'b1;
+	#(CLK_NS)
+	tb_en = 1'b0;
+	@(posedge tb_tx_done)
+	#(CLK_NS * 100)
+	
 	$stop;
 end
 
 endmodule
 ```
+
+#### 3.1.2 顶层模块测试
+
+采用ISSP输入数据方式，按按键发送一次。详见验证。
 
 ### 3.2 波形
 
@@ -126,13 +193,14 @@ endmodule
 
 ### 4.1 端口
 
-输入(按键)+输出(LED)
+ISSP + 输入(按键) + 完成(LED)
 
 ```verilog
-a	-->	key0(PIN_M16)
-b	-->	key1(PIN_E15)
-sel	-->	key2(PIN_E16)
-out	-->	led0(PIN_A2)
+clk_50mhz	-->	PIN_E1
+rst_n		-->	PIN_M16
+key_en		-->	PIN_E15
+tx_data		-->	PIN_A6
+tx_done		-->	PIN_A2
 
 IO Standard: 3.3V-LVTTL
 ```
