@@ -30,16 +30,20 @@ always #(CLK_NS / 2) tb_clk_50mhz = ~tb_clk_50mhz;
 initial begin
 	tb_clk_50mhz = 1'b0;
 	tb_rst_n = 1'b0;
-	tb_en = 1'b1;
-	tb_dis_data = 32'h12345678;
+	tb_en = 1'b0;
+	tb_dis_data = 32'd0;
 	#(CLK_NS * 100)
 	
 	tb_rst_n = 1'b1;
 	#(CLK_NS * 100)
+	
+	tb_en = 1'b1;
+	tb_dis_data = 32'h12345678;
+	#(CLK_NS * 200)
 	tb_dis_data = 32'h87654321;
-	#(CLK_NS * 100);
+	#(CLK_NS * 200);
 	tb_dis_data = 32'h89abcdef;
-	#(CLK_NS * 100);
+	#(CLK_NS * 200);
 	
 	$stop;
 end

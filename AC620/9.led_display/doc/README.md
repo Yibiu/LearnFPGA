@@ -277,7 +277,57 @@ endmodule
 
 - 首先生成74HC595工作时钟clk_12_5mhz，然后根据时钟工作；
 - 状态迁移的敏感列表为clk_12_5mhz，因此会较cnt_edge的变化滞后一个时钟周期；但由于数据一直连续传输，因此并无太大影响；
-- st_clk应该在传输完成时置高，程序中为了简化将置高提到传输刚开始时，同步的其实是上一次的数据传输；由于数据一直连续传输，因此并无太大影响。
+- st_clk应该在传输完成时置高，程序中将置高提到传输刚开始时，同步的其实是上一次的数据传输；由于数据一直连续传输，因此并无影响。
+
+### 2.3 顶层模块
+
+顶层模块结合数码管驱动和74HC595驱动，组合成完整的8位7段数码管驱动设计。其主要工作是实例化，为了可以动态改变数码管显示的数值，加入 **ISSP** 模块功能，ISSP会产生要显示的字符且支持界面操作：
+
+```verilog
+module led_display(
+	input wire clk_50mhz,
+	input wire rst_n,
+	output wire ds,
+	output wire sh_clk,
+	output wire st_clk
+);
+
+wire [31:0] dis_data;
+wire [7:0] sel;
+wire [7:0] seg;
+
+
+// ISSP例化
+hex_data hex_data_inst0(
+	.probe(),
+	.source(dis_data)
+);
+
+
+// LED驱动例化
+led_driver led_driver_inst0(
+	.clk_50mhz(clk_50mhz),
+	.rst_n(rst_n),
+	.en(1'b1),
+	.dis_data(dis_data),
+	.sel(sel),
+	.seg(seg)
+);
+
+
+// HC959例化
+hc595_driver hc595_driver_inst0(
+	.clk_50mhz(clk_50mhz),
+	.rst_n(rst_n),
+	.en(1'b1),
+	.data({seg, sel}),
+	.ds(ds),
+	.sh_clk(sh_clk),
+	.st_clk(st_clk)
+);
+
+endmodule
+```
 
 
 
@@ -287,52 +337,125 @@ endmodule
 
 ### 3.1 TestBench
 
-guiguhgygo
+#### 3.1.1 数码管驱动测试
+
+数码管内部生成1KHz时钟自动扫描，故只需给出相应信号且执行一段时间即可。由于1KHz计数值较大，仿真时间较长，故仿真时将CNT_1KHZ改为10缩小仿真时间：
 
 ```verilog
 `timescale 1ns/1ns
- 
 
-module tb_mux2(
+
+module tb_led_driver(
 );
 
-reg tb_a;
-reg tb_b;
-reg tb_sel;
-wire tb_out;
+reg tb_clk_50mhz;
+reg tb_rst_n;
+reg tb_en;
+reg [31:0] tb_dis_data;
+wire [7:0] tb_sel;
+wire [7:0] tb_seg;
 
-// mux2例化
-mux2 mux2_inst0(
-	.a(tb_a),
-	.b(tb_b),
+parameter CLK_NS = 20;
+
+// 例化
+led_driver #(.CNT_1KHZ(10)) led_driver_inst0(
+	.clk_50mhz(tb_clk_50mhz),
+	.rst_n(tb_rst_n),
+	.en(tb_en),
+	.dis_data(tb_dis_data),
 	.sel(tb_sel),
-	.out(tb_out)
+	.seg(tb_seg)
 );
+
+// 时钟
+always #(CLK_NS / 2) tb_clk_50mhz = ~tb_clk_50mhz;
 
 // 初始化
 initial begin
-	tb_sel = 0;tb_a = 0;tb_b = 0;
-	#100
-	tb_sel = 0;tb_a = 0;tb_b = 1;
-	#100
-	tb_sel = 0;tb_a = 1;tb_b = 0;
-	#100
-	tb_sel = 0;tb_a = 1;tb_b = 1;
-	#100
-	tb_sel = 1;tb_a = 0;tb_b = 0;
-	#100
-	tb_sel = 1;tb_a = 0;tb_b = 1;
-	#100
-	tb_sel = 1;tb_a = 1;tb_b = 0;
-	#100
-	tb_sel = 1;tb_a = 1;tb_b = 1;
-	#100
-
+	tb_clk_50mhz = 1'b0;
+	tb_rst_n = 1'b0;
+	tb_en = 1'b0;
+	tb_dis_data = 32'd0;
+	#(CLK_NS * 100)
+	
+	tb_rst_n = 1'b1;
+	#(CLK_NS * 100)
+	
+	tb_en = 1'b1;
+	tb_dis_data = 32'h12345678;
+	#(CLK_NS * 200)
+	tb_dis_data = 32'h87654321;
+	#(CLK_NS * 200);
+	tb_dis_data = 32'h89abcdef;
+	#(CLK_NS * 200);
+	
 	$stop;
 end
 
 endmodule
 ```
+
+#### 3.1.2 74HC595驱动测试
+
+74HC595与数码管类似，内部也有工作时钟12.5MHz，且内部自动连续转换，由于CNT_12_5MHZ计数值不大，因此仿真时无需改动：
+
+```verilog
+`timescale 1ns/1ns
+
+
+module tb_hc595_driver(
+);
+
+reg tb_clk_50mhz;
+reg tb_rst_n;
+reg tb_en;
+reg [15:0] tb_data;
+wire tb_ds;
+wire tb_sh_clk;
+wire tb_st_clk;
+
+parameter CLK_NS = 20;
+
+// 例化
+hc595_driver hc595_driver_inst0(
+	.clk_50mhz(tb_clk_50mhz),
+	.rst_n(tb_rst_n),
+	.en(tb_en),
+	.data(tb_data),
+	.ds(tb_ds),
+	.sh_clk(tb_sh_clk),
+	.st_clk(tb_st_clk)
+);
+
+// 时钟
+always #(CLK_NS / 2) tb_clk_50mhz = ~tb_clk_50mhz;
+
+// 初始化
+initial begin
+	tb_clk_50mhz = 1'b0;
+	tb_rst_n = 1'b0;
+	tb_en = 1'b0;
+	tb_data = 16'h0000;
+	#(CLK_NS * 10)
+	
+	tb_rst_n = 1'b1;
+	#(CLK_NS * 10)
+	
+	tb_en = 1'b1;
+	tb_data = 16'habcd;
+	#(CLK_NS * 100)
+	tb_data = 16'h8ff1;
+	#(CLK_NS * 100)
+	
+	$stop;
+end
+
+endmodule
+```
+
+#### 3.1.3 顶层模块测试
+
+顶层模块使用ISSP，因此可下载到开发板测试，详见验证阶段。
 
 ### 3.2 波形
 
@@ -346,13 +469,14 @@ endmodule
 
 ### 4.1 端口
 
-输入(按键)+输出(LED)
+ISSP(界面)
 
 ```verilog
-a	-->	key0(PIN_M16)
-b	-->	key1(PIN_E15)
-sel	-->	key2(PIN_E16)
-out	-->	led0(PIN_A2)
+clk_50mhz	-->	PIN_E1
+rst_n		-->	PIN_E16
+ds			-->	PIN_E6
+sh_clk		-->	PIN_F6
+st_clk		-->	PIN_B4
 
 IO Standard: 3.3V-LVTTL
 ```
