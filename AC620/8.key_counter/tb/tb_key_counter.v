@@ -35,45 +35,70 @@ initial begin
 	tb_rst_n = 1'b1;
 	#(CLK_NS * 1000)
 	
-	press_key(tb_key_plus);
+	press_plus;
 	#(CLK_NS * 1000);
-	press_key(tb_key_plus);
+	press_plus;
 	#(CLK_NS * 1000);
-	press_key(tb_key_plus);
+	press_plus;
 	#(CLK_NS * 1000);
-	press_key(tb_key_minus);
+	press_minus;
 	#(CLK_NS * 1000);
-	press_key(tb_key_minus);
+	press_minus;
 	#(CLK_NS * 1000);
-	press_key(tb_key_minus);
+	press_minus;
 	#(CLK_NS * 1000);
 	
 	$stop;
 end
 
-// 模拟按键(Task)
-reg [15:0] rand_time;
-task press_key;
-	input key;
+// 模拟按键plus(Task)
+reg [15:0] rand_plus;
+task press_plus;
 	begin
 		// 50次随机按下抖动(每次不大于20ms)
 		repeat(50) begin
-			rand_time = {$random} % (CLK_NS * 90);
-			#rand_time
-			key = ~key;
+			rand_plus = {$random} % (CLK_NS * 90);
+			#rand_plus
+			tb_key_plus = ~tb_key_plus;
 		end
 		
 		// DOWN状态
-		key = 1'b0;
+		tb_key_plus = 1'b0;
 		#(CLK_NS * 500);
 		
 		// 50次随机释放抖动(每次不大于20ms)
 		repeat(50) begin
-			rand_time = {$random} % (CLK_NS * 90);
-			#rand_time
-			key = ~key;
+			rand_plus = {$random} % (CLK_NS * 90);
+			#rand_plus
+			tb_key_plus = ~tb_key_plus;
 		end
-		key = 1'b1;
+		tb_key_plus = 1'b1;
+		#(CLK_NS * 500);
+	end
+endtask
+
+// 模拟按键minus(Task)
+reg [15:0] rand_minus;
+task press_minus;
+	begin
+		// 50次随机按下抖动(每次不大于20ms)
+		repeat(50) begin
+			rand_minus = {$random} % (CLK_NS * 90);
+			#rand_minus
+			tb_key_minus = ~tb_key_minus;
+		end
+		
+		// DOWN状态
+		tb_key_minus = 1'b0;
+		#(CLK_NS * 500);
+		
+		// 50次随机释放抖动(每次不大于20ms)
+		repeat(50) begin
+			rand_minus = {$random} % (CLK_NS * 90);
+			#rand_minus
+			tb_key_minus = ~tb_key_minus;
+		end
+		tb_key_minus = 1'b1;
 		#(CLK_NS * 500);
 	end
 endtask
