@@ -14,6 +14,10 @@ module uart_recv(
 );
 
 
+reg [8:0] bps_target;
+reg [8:0] bps_cnt;
+
+
 // START + DATA0~7 + STOP
 // 16 cnt for every state
 // 2^7 < 10 * 16 = 160 < 2^8
@@ -41,7 +45,7 @@ always @(posedge clk_50mhz or negedge rst_n)
 		rx_state <= 1'b0;
 	else if (nedge)
 		rx_state <= 1'b1;
-	else if (state_cnt == 8'd156)
+	else if (state_cnt == 8'd156 && bps_cnt == bps_target)
 		rx_state <= 1'b0;
 	else
 		rx_state <= rx_state;
@@ -56,7 +60,6 @@ always @(posedge clk_50mhz or negedge rst_n)
 // 3           57600        17361     17361/sys_clk_period     868-1                     868/16-1=53
 // 4           115200       8680      8680/sys_clk_period      434-1                     434/16-1=26
 //
-reg [8:0] bps_target;
 always @(posedge clk_50mhz or negedge rst_n)
 	if (rst_n == 1'b0)
 		bps_target <= 9'd324;
@@ -70,7 +73,6 @@ always @(posedge clk_50mhz or negedge rst_n)
 			default:bps_target<=9'd324;
 		endcase
 
-reg [8:0] bps_cnt;
 always @(posedge clk_50mhz or negedge rst_n)
 	if (rst_n == 1'b0)
 		bps_cnt <= 9'd0;
@@ -100,7 +102,7 @@ always @(posedge clk_50mhz or negedge rst_n)
 		state_cnt <= 8'd0;
 
 
-// 状态迁移
+// 状态迁移，数据暂存
 reg [2:0] rx_start_r;
 reg [2:0] rx_stop_r;
 reg [2:0] rx_data_r [7:0];
@@ -133,16 +135,16 @@ always @(negedge clk_50mhz or negedge rst_n)
 						rx_data_r[6] <= 3'd0;
 						rx_data_r[7] <= 3'd0;
 					end
-				6,7,8,9,10,11:rx_start_r<=rx_start_r+data;
-				22,23,24,25,26,27:rx_data_r[0]<=rx_data_r[0]+data;
-				38,39,40,41,42,43:rx_data_r[1]<=rx_data_r[1]+data;
-				54,55,56,57,58,59:rx_data_r[2]<=rx_data_r[2]+data;
-				70,71,72,73,74,75:rx_data_r[3]<=rx_data_r[3]+data;
-				86,87,88,89,90,91:rx_data_r[4]<=rx_data_r[4]+data;
-				102,103,104,105,106,107:rx_data_r[5]<=rx_data_r[5]+data;
-				118,119,120,121,122,123:rx_data_r[6]<=rx_data_r[6]+data;
-				134,135,136,137,138,139:rx_data_r[7]<=rx_data_r[7]+data;
-				150,151,152,153,154,155:rx_stop_r<=rx_stop_r+data;
+				5,6,7,8,9,10:rx_start_r<=rx_start_r+data;
+				21,22,23,24,25,26:rx_data_r[0]<=rx_data_r[0]+data;
+				37,38,39,40,41,42:rx_data_r[1]<=rx_data_r[1]+data;
+				53,54,55,56,57,58:rx_data_r[2]<=rx_data_r[2]+data;
+				69,70,71,72,73,74:rx_data_r[3]<=rx_data_r[3]+data;
+				85,86,87,88,89,90:rx_data_r[4]<=rx_data_r[4]+data;
+				101,102,103,104,105,106:rx_data_r[5]<=rx_data_r[5]+data;
+				117,118,119,120,121,122:rx_data_r[6]<=rx_data_r[6]+data;
+				133,134,135,136,137,138:rx_data_r[7]<=rx_data_r[7]+data;
+				149,150,151,152,153,154:rx_stop_r<=rx_stop_r+data;
 				default:
 					begin
 						rx_start_r <= rx_start_r;
@@ -158,13 +160,14 @@ always @(negedge clk_50mhz or negedge rst_n)
 					end
 			endcase
 	end
-	
+
+// 输出
 always @(posedge clk_50mhz or negedge rst_n)
 	if (rst_n == 1'b0) begin
 		rx_data <= 8'd0;
 		rx_done <= 1'b0;
 	end
-	else if (state_cnt == 8'd156) begin
+	else if (state_cnt == 8'd156 && bps_cnt == bps_target) begin
 			rx_data[0] <= rx_data_r[0][2];
 			rx_data[1] <= rx_data_r[1][2];
 			rx_data[2] <= rx_data_r[2][2];

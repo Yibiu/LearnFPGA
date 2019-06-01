@@ -34,10 +34,10 @@ initial begin
 	tb_rst_n = 1'b0;
 	tb_baud = 3'd4;
 	tb_data = 1'b1;
-	#(CLK_NS * 10)
+	#(CLK_NS * 100)
 	
 	tb_rst_n = 1'b1;
-	#(CLK_NS * 10)
+	#(CLK_NS * 100)
 	// START
 	tb_data = 1'b0;
 	#(CLK_NS * 27 * 16)
