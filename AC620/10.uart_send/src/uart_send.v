@@ -14,6 +14,9 @@ module uart_send(
 );
 
 
+reg [12:0] bps_target;
+reg [12:0] bps_cnt;
+
 reg [3:0] state_cnt;
 
 
@@ -23,7 +26,7 @@ always @(posedge clk_50mhz or negedge rst_n)
 		tx_state <= 1'b0;
 	else if (en)
 		tx_state <= 1'b1;
-	else if (state_cnt == 4'd10)
+	else if (state_cnt == 4'd9 && bps_cnt == bps_target)
 		tx_state <= 1'b0;
 	else
 		tx_state <= tx_state;
@@ -38,7 +41,6 @@ always @(posedge clk_50mhz or negedge rst_n)
 // 3           57600        17361     17361/sys_clk_period     868-1
 // 4           115200       8680      8680/sys_clk_period      434-1
 //
-reg [12:0] bps_target;
 always @(posedge clk_50mhz or negedge rst_n)
 	if (rst_n == 1'b0)
 		bps_target <= 13'd5207;
@@ -52,7 +54,6 @@ always @(posedge clk_50mhz or negedge rst_n)
 			default:bps_target<=13'd5207;
 		endcase
 
-reg [12:0] bps_cnt;
 always @(posedge clk_50mhz or negedge rst_n)
 	if (rst_n == 1'b0)
 		bps_cnt <= 13'd0;
@@ -70,7 +71,7 @@ always @(posedge clk_50mhz or negedge rst_n)
 		state_cnt <= 4'd0;
 	else if (tx_state) begin
 		if (bps_cnt == bps_target) begin
-			if (state_cnt == 4'd10)
+			if (state_cnt == 4'd9)
 				state_cnt <= 4'd0;
 			else
 				state_cnt <= state_cnt + 1'b1;
@@ -99,8 +100,17 @@ always @(posedge clk_50mhz or negedge rst_n)
 			4'd6:begin tx_data<=data[5];tx_done<=1'b0;end
 			4'd7:begin tx_data<=data[6];tx_done<=1'b0;end
 			4'd8:begin tx_data<=data[7];tx_done<=1'b0;end
-			4'd9:begin tx_data<=1'b1;tx_done<=1'b0;end
-			4'd10:begin tx_data<=1'b1;tx_done<=1'b1;end
+			4'd9:
+				begin
+					if (bps_cnt == bps_target) begin
+						tx_data<=1'b1;
+						tx_done<=1'b1;
+					end
+					else begin
+						tx_data<=1'b1;
+						tx_done<=1'b0;
+					end
+				end
 			default:begin tx_data<=1'b1;tx_done<=1'b0;end
 		endcase
 	end

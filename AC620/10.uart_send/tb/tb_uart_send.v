@@ -48,13 +48,13 @@ initial begin
 	#(CLK_NS)
 	tb_en = 1'b0;
 	@(posedge tb_tx_done)
-	#(CLK_NS * 100)
+	#(CLK_NS * 500)
 	tb_data = 8'b1000_0001;
 	tb_en = 1'b1;
 	#(CLK_NS)
 	tb_en = 1'b0;
 	@(posedge tb_tx_done)
-	#(CLK_NS * 100)
+	#(CLK_NS * 500)
 	
 	$stop;
 end

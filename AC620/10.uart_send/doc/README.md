@@ -33,7 +33,124 @@ FPGA设计思路为：由 `en` 标识一次数据传输的开始，并使用 `st
 设计针对发送的详细时序：首先en接收到高脉冲，则标识传输开始，置tx_state为高，tx_state标识整个传输过程；之后开启波特率计数，当波特率计数满时state_cnt进行状态切换，同时根据state_cnt的状态值对tx赋值。
 
 ```verilog
+module uart_send(
+	input wire clk_50mhz,
+	input wire rst_n,
+	input wire en,
+	input wire [2:0] baud,
+	input wire [7:0] data,
+	output reg tx_state,
+	output reg tx_data,
+	output reg tx_done
+);
+
+
+reg [12:0] bps_target;
+reg [12:0] bps_cnt;
+
+reg [3:0] state_cnt;
+
+
+// 开始位检测,tx_state输出
+always @(posedge clk_50mhz or negedge rst_n)
+	if (rst_n == 1'b0)
+		tx_state <= 1'b0;
+	else if (en)
+		tx_state <= 1'b1;
+	else if (state_cnt == 4'd9 && bps_cnt == bps_target)
+		tx_state <= 1'b0;
+	else
+		tx_state <= tx_state;
+
+
 //
+// 波特率计算和生成,当数据发送期间(state!=IDEL)生成波特率
+// 序号baud    波特率bps    周期ns    分频计数值               50MHz系统时钟脉冲计数值
+// 0           9600         104167    104167/sys_clk_period    5208-1
+// 1           19200        52083     52083/sys_clk_period     2604-1
+// 2           38400        26041     26041/sys_clk_period     1302-1
+// 3           57600        17361     17361/sys_clk_period     868-1
+// 4           115200       8680      8680/sys_clk_period      434-1
+//
+always @(posedge clk_50mhz or negedge rst_n)
+	if (rst_n == 1'b0)
+		bps_target <= 13'd5207;
+	else
+		case(baud)
+			3'd0:bps_target<=13'd5207;
+			3'd1:bps_target<=13'd2603;
+			3'd2:bps_target<=13'd1301;
+			3'd3:bps_target<=13'd867;
+			3'd4:bps_target<=13'd433;
+			default:bps_target<=13'd5207;
+		endcase
+
+always @(posedge clk_50mhz or negedge rst_n)
+	if (rst_n == 1'b0)
+		bps_cnt <= 13'd0;
+	else if (tx_state) begin
+		if (bps_cnt == bps_target)
+			bps_cnt <= 13'd0;
+		else
+			bps_cnt <= bps_cnt + 1'b1;
+	end
+	else
+		bps_cnt <= 13'd0;
+
+always @(posedge clk_50mhz or negedge rst_n)
+	if (rst_n == 1'b0)
+		state_cnt <= 4'd0;
+	else if (tx_state) begin
+		if (bps_cnt == bps_target) begin
+			if (state_cnt == 4'd9)
+				state_cnt <= 4'd0;
+			else
+				state_cnt <= state_cnt + 1'b1;
+		end
+		else
+			state_cnt <= state_cnt;
+	end
+	else
+		state_cnt <= 4'd0;
+
+
+// 状态迁移
+always @(posedge clk_50mhz or negedge rst_n)
+	if (rst_n == 1'b0) begin
+		tx_data <= 1'b1;
+		tx_done <= 1'b0;
+	end
+	else if (tx_state) begin
+		case(state_cnt)
+			4'd0:begin tx_data<=1'b0;tx_done<=1'b0;end
+			4'd1:begin tx_data<=data[0];tx_done<=1'b0;end
+			4'd2:begin tx_data<=data[1];tx_done<=1'b0;end
+			4'd3:begin tx_data<=data[2];tx_done<=1'b0;end
+			4'd4:begin tx_data<=data[3];tx_done<=1'b0;end
+			4'd5:begin tx_data<=data[4];tx_done<=1'b0;end
+			4'd6:begin tx_data<=data[5];tx_done<=1'b0;end
+			4'd7:begin tx_data<=data[6];tx_done<=1'b0;end
+			4'd8:begin tx_data<=data[7];tx_done<=1'b0;end
+			4'd9:
+				begin
+					if (bps_cnt == bps_target) begin
+						tx_data<=1'b1;
+						tx_done<=1'b1;
+					end
+					else begin
+						tx_data<=1'b1;
+						tx_done<=1'b0;
+					end
+				end
+			default:begin tx_data<=1'b1;tx_done<=1'b0;end
+		endcase
+	end
+	else begin
+		tx_data <= 1'b1;
+		tx_done <= 1'b0;
+	end
+	
+endmodule
 ```
 
 需要关注的有以下几个地方：
@@ -104,9 +221,7 @@ endmodule
 
 ## 三：测试
 
-### 3.1 TestBench
-
-#### 3.1.1 UART发送模块测试
+### 3.1 UART发送模块测试
 
 为了减少仿真时间，仿真时选择最大比特率。
 
@@ -163,13 +278,13 @@ initial begin
 	#(CLK_NS)
 	tb_en = 1'b0;
 	@(posedge tb_tx_done)
-	#(CLK_NS * 100)
+	#(CLK_NS * 500)
 	tb_data = 8'b1000_0001;
 	tb_en = 1'b1;
 	#(CLK_NS)
 	tb_en = 1'b0;
 	@(posedge tb_tx_done)
-	#(CLK_NS * 100)
+	#(CLK_NS * 500)
 	
 	$stop;
 end
@@ -177,11 +292,27 @@ end
 endmodule
 ```
 
-#### 3.1.2 顶层模块测试
+仿真波形：
+
+![sim](./sim.png)
+
+开始时波形：
+
+![start](./start.png)
+
+中间波形：
+
+![middle](./middle.png)
+
+结束时波形：
+
+![stop](./stop.png)
+
+仿真波形与上述分析一致，符合预期。
+
+### 3.2 顶层模块测试
 
 采用ISSP输入数据方式，按按键发送一次。详见验证。
-
-### 3.2 波形
 
 
 
