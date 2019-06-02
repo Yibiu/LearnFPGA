@@ -8,11 +8,11 @@ reg tb_clk_50mhz;
 reg tb_rst_n;
 reg tb_en;
 reg [15:0] tb_data;
-wire tb_dac_done;
 wire tb_dac_cs_n;
-wire tb_dac_din;
-wire tb_dac_sclk;
 wire tb_dac_state;
+wire tb_dac_sclk;
+wire tb_dac_din;
+wire tb_dac_done;
 
 parameter CLK_NS = 20;
 
@@ -22,11 +22,11 @@ dac dac_inst0(
 	.rst_n(tb_rst_n),
 	.en(tb_en),
 	.data(tb_data),
-	.dac_done(tb_dac_done),
 	.dac_cs_n(tb_dac_cs_n),
-	.dac_din(tb_dac_din),
+	.dac_state(tb_dac_state),
 	.dac_sclk(tb_dac_sclk),
-	.dac_state(tb_dac_state)
+	.dac_din(tb_dac_din),
+	.dac_done(tb_dac_done)
 );
 
 // 时钟
@@ -43,21 +43,21 @@ initial begin
 	tb_rst_n = 1'b1;
 	#(CLK_NS * 20)
 	
-	tb_data = 16'hcaaa;
+	tb_data = 16'hc_aaa;
 	tb_en = 1'b1;
 	#(CLK_NS)
 	tb_en = 1'b0;
 	//wait(tb_dac_done);
 	#(CLK_NS * 100)
 	
-	tb_data = 16'h1234;
+	tb_data = 16'hc_555;
 	tb_en = 1'b1;
 	#(CLK_NS)
 	tb_en = 1'b0;
 	//wait(tb_dac_done);
 	#(CLK_NS * 100)
 	
-	tb_data = 16'habcd;
+	tb_data = 16'h4_555;
 	tb_en = 1'b1;
 	#(CLK_NS)
 	tb_en = 1'b0;
