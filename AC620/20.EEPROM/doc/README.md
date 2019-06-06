@@ -32,6 +32,10 @@ EEPROM存储器，使用IIC协议通信。IIC总线时序，总是发生在SCLK�
 
   ![read1](./read1.png)
 
+IIC时钟总线采用频率 **400KHz** 。
+
+
+
 
 
 
