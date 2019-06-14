@@ -173,14 +173,17 @@ endtask
 // 状态迁移
 reg rdwr_r;
 reg ctrl_r;
+reg [5:0] num_r;
 always @(posedge clk_50mhz or negedge rst_n)
 	if (rst_n == 1'b0) begin
 		state <= IDEL;
 		state_cnt_target <= 0;
-		state_cnt <= 1'b0;
+		state_cnt <= 6'd0;
 		state_data <= 8'd0;
+		done <= 2'd0;
 		rdwr_r <= 1'b0;
 		ctrl_r <= 1'b0;
+		num_r <= 6'd0;
 	end
 	else begin
 		case(state)
@@ -188,17 +191,18 @@ always @(posedge clk_50mhz or negedge rst_n)
 				begin
 					if (wr_en) begin
 						state_cnt_target <= CNT_TARGET_START;
-						state_cnt <= 1'b0;
+						state_cnt <= 6'd0;
 						state <= START;
 						rdwr_r <= 1'b1;
 					end
 					else if (rd_en) begin
 						state_cnt_target <= CNT_TARGET_START;
-						state_cnt <= 1'b0;
+						state_cnt <= 6'd0;
 						state <= START;
 						rdwr_r <= 1'b0;
 					end
 					ctrl_r <= 1'b0;
+					num_r <= 6'd0;
 				end
 			START:
 				begin
@@ -206,14 +210,14 @@ always @(posedge clk_50mhz or negedge rst_n)
 						if (state_cnt == state_cnt_target - 1) begin
 							if (rdwr_r) begin
 								state_cnt_target <= CNT_TARGET_CTRL_WRITE;
-								state_cnt <= 1'b0;
+								state_cnt <= 6'd0;
 								state_data <= {4'b1010,dev_addr,1'b0};
 								state <= CTRL_WRITE;
 							end
 							else begin
 								state_cnt_target <= CNT_TARGET_CTRL_READ;
-								state_cnt <= 1'b0;
-								state_data <= {4'b1010,dev_addr,1'b1};
+								state_cnt <= 6'd0;
+								state_data <= {4'b1010,dev_addr,1'b0};
 								state <= CTRL_READ;
 							end
 						end
@@ -226,13 +230,13 @@ always @(posedge clk_50mhz or negedge rst_n)
 						if (state_cnt == state_cnt_target - 1) begin
 							if (addr_num == 2'd2) begin
 								state_cnt_target <= CNT_TARGET_ADDR1;
-								state_cnt <= 1'b0;
+								state_cnt <= 6'd0;
 								state_data <= addr_addr[15:8];
 								state <= ADDR1;
 							end
 							else begin
 								state_cnt_target <= CNT_TARGET_ADDR0;
-								state_cnt <= 1'b0;
+								state_cnt <= 6'd0;
 								state_data <= addr_addr[7:0];
 								state <= ADDR0;
 							end
@@ -244,37 +248,119 @@ always @(posedge clk_50mhz or negedge rst_n)
 				begin
 					if (scl_flag) begin
 						if (state_cnt == state_cnt_target - 1) begin
-							if (addr_num == 2'd2) begin
-								state_cnt_target <= CNT_TARGET_ADDR1;
-								state_cnt <= 1'b0;
-								state_data <= addr_addr[15:8];
-								state <= ADDR1;
+							// CTRL_READ --> ADDR1/ADDR0
+							if (ctrl_r == 1'b0) begin
+								if (addr_num == 2'd2) begin
+									state_cnt_target <= CNT_TARGET_ADDR1;
+									state_cnt <= 6'd0;
+									state_data <= addr_addr[15:8];
+									state <= ADDR1;
+								end
+								else begin
+									state_cnt_target <= CNT_TARGET_ADDR0;
+									state_cnt <= 6'd0;
+									state_data <= addr_addr[7:0];
+									state <= ADDR0;
+								end
 							end
+							// CTRL_READ --> READ_DATA
 							else begin
-								state_cnt_target <= CNT_TARGET_ADDR0;
-								state_cnt <= 1'b0;
-								state_data <= addr_addr[7:0];
-								state <= ADDR0;
+								state_cnt_target <= CNT_TARGET_READ_DATA;
+								state_cnt <= 6'd0;
+								state_data <= 8'd0;
+								state <= READ_DATA;
 							end
 							ctrl_r <= ~ctrl_r;
 						end
-						task_read_byte;
+						task_write_byte;
 					end
 				end
 			ADDR0:
 				begin
+					if (scl_flag) begin
+						if (state_cnt == state_cnt_target - 1) begin
+							// ADDR0 --> WRITE_DATA
+							if (rdwr_r) begin
+								state_cnt_target <= CNT_TARGET_WRITE_DATA;
+								state_cnt <= 6'd0;
+								state_data <= wr_data;
+								state <= WRITE_DATA;
+							end
+							// ADDR0 --> CTRL_READ
+							else begin
+								state_cnt_target <= CNT_TARGET_CTRL_READ;
+								state_cnt <= 6'd0;
+								state_data <= {4'b1010,dev_addr,1'b1};
+								state <= CTRL_READ;
+							end
+						end
+						task_write_byte;
+					end
 				end
 			ADDR1:
 				begin
+					if (scl_flag) begin
+						if (state_cnt == state_cnt_target - 1) begin
+							state_cnt_target <= CNT_TARGET_ADDR0;
+							state_cnt <= 6'd0;
+							state_data <= addr_addr[7:0];
+							state <= ADDR0;
+						end
+						task_write_byte;
+					end
 				end
 			WRITE_DATA:
 				begin
+					if (scl_flag) begin
+						if (state_cnt == state_cnt_target - 1) begin
+							if (num_r == wr_num) begin
+								state_cnt_target <= CNT_TARGET_STOP;
+								state_cnt <= 6'd0;
+								state_data <= 8'd0;
+								state <= STOP;
+							end
+							else begin
+								state_cnt <= 6'd0;
+								state_data <= addr_addr[7:0];
+							end
+							num_r = num_r + 1'b1;
+							wr_update = 1'b1;
+						end
+						task_write_byte;
+					end
 				end
 			READ_DATA:
 				begin
+					if (scl_flag) begin
+						if (state_cnt == state_cnt_target - 1) begin
+							if (num_r == rd_num) begin
+								state_cnt_target <= CNT_TARGET_STOP;
+								state_cnt <= 6'd0;
+								//state_data <= 8'd0;
+								state <= STOP;
+							end
+							else begin
+								state_cnt <= 6'd0;
+								//state_data <= addr_addr[7:0];
+							end
+							num_r = num_r + 1'b1;
+							rd_update = 1'b1;
+						end
+						task_read_byte;
+					end
 				end
 			STOP:
 				begin
+					if (scl_flag) begin
+						if (state_cnt == state_cnt_target - 1) begin
+							state_cnt_target <= 0;
+							state_cnt <= 6'd0;
+							state_data <= 8'd0;
+							state <= IDEL;
+							done <= 2'b01;
+						end
+						task_stop;
+					end
 				end
 			default:;
 		endcase
